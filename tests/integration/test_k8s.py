@@ -78,7 +78,7 @@ async def test_verbose_config(kubernetes_cluster: juju.model.Model):
 
 
 @pytest.mark.usefixtures("preserve_charm_config")
-async def test_nodes_labelled(request, kubernetes_cluster: juju.model.Model):
+async def test_nodes_labelled(request, kubernetes_cluster: juju.model.Model, timeout: int):
     """Test the charms label the nodes appropriately."""
     testname: str = request.node.name
     k8s: juju.application.Application = kubernetes_cluster.applications["k8s"]
@@ -87,7 +87,7 @@ async def test_nodes_labelled(request, kubernetes_cluster: juju.model.Model):
     # Set a VALID node-label on both k8s and worker
     label_config = {"node-labels": f"{testname}="}
     await asyncio.gather(k8s.set_config(label_config), worker.set_config(label_config))
-    await kubernetes_cluster.wait_for_idle(status="active", timeout=5 * 60)
+    await kubernetes_cluster.wait_for_idle(status="active", timeout=timeout * 60)
 
     nodes = await get_rsc(k8s.units[0], "nodes")
     labelled = [n for n in nodes if testname in n["metadata"]["labels"]]
@@ -102,7 +102,7 @@ async def test_nodes_labelled(request, kubernetes_cluster: juju.model.Model):
     # Set an INVALID node-label on both k8s and worker
     label_config = {"node-labels": f"{testname}=invalid="}
     await asyncio.gather(k8s.set_config(label_config), worker.set_config(label_config))
-    await kubernetes_cluster.wait_for_idle(timeout=5 * 60)
+    await kubernetes_cluster.wait_for_idle(timeout=timeout * 60)
     leader_idx = await get_leader(k8s)
     leader: juju.unit.Unit = k8s.units[leader_idx]
     assert leader.workload_status == "blocked", "Leader not blocked"
@@ -197,7 +197,7 @@ async def test_override_snap_resource(kubernetes_cluster: juju.model.Model, requ
     try:
         with override.open("rb") as obj:
             k8s.attach_resource("snap-installation", override, obj)
-            await kubernetes_cluster.wait_for_idle(status="active", idle_period=30)
+            await kubernetes_cluster.wait_for_idle(status="active", idle_period=120)
 
         for _unit in k8s.units:
             assert "Override" in _unit.workload_status_message
